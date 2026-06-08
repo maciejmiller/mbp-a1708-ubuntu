@@ -266,6 +266,15 @@ EOF
 module_wifi() {
     header "Wi-Fi (brcmfmac)"
 
+    # Remove bcmwl/broadcom-sta if present — conflicts with brcmfmac
+    if dkms status 2>/dev/null | grep -q '^broadcom-sta'; then
+        warn "broadcom-sta (bcmwl) detected — removing, conflicts with brcmfmac"
+        dkms remove broadcom-sta/$(dkms status | grep broadcom-sta | head -1 | awk -F'[/,]' '{print $2}' | tr -d ' ') --all >> "$LOGFILE" 2>&1 || true
+        apt-get remove -y bcmwl-kernel-source broadcom-sta-dkms 2>/dev/null >> "$LOGFILE" 2>&1 || true
+        modprobe -r wl 2>/dev/null || true
+        ok "broadcom-sta removed"
+    fi
+
     local driver_ok=0 firmware_ok=0
 
     if lsmod | grep -q '^brcmfmac'; then
