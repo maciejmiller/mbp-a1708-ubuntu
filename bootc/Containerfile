@@ -1,0 +1,172 @@
+# ============================================================
+#  Containerfile — MacBook Air A1466 (MacBookAir7,2)
+#  Custom Fedora Silverblue 42 image via bootc
+#
+#  Budowanie:
+#    podman build -t mba-a1466:latest .
+#
+#  ISO:
+#    ./build-iso.sh
+# ============================================================
+
+FROM quay.io/fedora/fedora-silverblue:42
+
+# ── Metadane ─────────────────────────────────────────────────
+LABEL org.opencontainers.image.title="Fedora Silverblue — MacBook Air A1466"
+LABEL org.opencontainers.image.description="Custom Silverblue for MacBookAir7,2 (Early 2015)"
+LABEL org.opencontainers.image.version="42.0"
+LABEL org.opencontainers.image.authors="maciejmiller"
+LABEL org.opencontainers.image.source="https://github.com/maciejmiller/mba-a1466-silverblue"
+
+# ── RPM Fusion repos ─────────────────────────────────────────
+RUN rpm-ostree install --idempotent \
+    "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-42.noarch.rpm" \
+    "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-42.noarch.rpm" \
+    && ostree container commit
+
+# ── Google Chrome repo ───────────────────────────────────────
+COPY config/google-chrome.repo /etc/yum.repos.d/google-chrome.repo
+
+# ── System packages (overlay) ────────────────────────────────
+RUN rpm-ostree install --idempotent \
+    \
+    # Wi-Fi — Broadcom BCM4360 (NIE brcmfmac — potrzebny wl)
+    broadcom-wl \
+    \
+    # Firmware
+    linux-firmware \
+    \
+    # Intel GPU / VA-API (Broadwell HD 6000)
+    intel-media-driver \
+    libva-intel-driver \
+    libva-utils \
+    \
+    # Zarządzanie energią
+    powertop \
+    tlp \
+    tlp-rdw \
+    \
+    # Bluetooth
+    bluez \
+    bluez-tools \
+    \
+    # Jasność / backlight
+    light \
+    \
+    # Ikony systemowe
+    papirus-icon-theme \
+    \
+    # Monitor systemu
+    btop \
+    \
+    # Google Chrome
+    google-chrome-stable \
+    \
+    # Narzędzia
+    curl \
+    unzip \
+    git \
+    \
+    && ostree container commit
+
+# ── Kernel parameters ────────────────────────────────────────
+# Zapisane do /etc/kernel/cmdline — bootc czyta przy generowaniu ISO
+RUN echo "hid_apple.fnmode=1 hid_apple.iso_layout=0 acpi_osi=Darwin pcie_ports=compat acpi_backlight=native mem_sleep_default=s2idle i915.enable_dc=1 quiet splash" \
+    > /etc/kernel/cmdline \
+    && ostree container commit
+
+# ── Wi-Fi — moduł wl + blacklist brcmfmac ────────────────────
+COPY config/modprobe/blacklist-broadcom.conf /etc/modprobe.d/blacklist-broadcom.conf
+COPY config/modules-load/broadcom-wl.conf    /etc/modules-load.d/broadcom-wl.conf
+
+# ── TLP ──────────────────────────────────────────────────────
+COPY config/tlp/tlp.conf /etc/tlp.conf
+RUN systemctl enable tlp.service \
+    && ostree container commit
+
+# ── Suspend hook ─────────────────────────────────────────────
+COPY config/sleep/mba-a1466-sleep.sh /usr/lib/systemd/system-sleep/mba-a1466-sleep.sh
+RUN chmod 755 /usr/lib/systemd/system-sleep/mba-a1466-sleep.sh
+
+# ── Lid switch ───────────────────────────────────────────────
+RUN sed -i 's/^#*HandleLidSwitch=.*/HandleLidSwitch=suspend/'                 /etc/systemd/logind.conf \
+ && sed -i 's/^#*HandleLidSwitchExternalPower=.*/HandleLidSwitchExternalPower=suspend/' /etc/systemd/logind.conf
+
+# ── btop config (skel → trafi do każdego nowego użytkownika) ─
+RUN mkdir -p /etc/skel/.config/btop
+COPY config/btop/btop.conf /etc/skel/.config/btop/btop.conf
+
+# ── Czcionki — Inter + JetBrains Mono ────────────────────────
+RUN mkdir -p /usr/share/fonts/inter /usr/share/fonts/jetbrains-mono
+
+# Inter
+RUN INTER_URL=$(curl -s https://api.github.com/repos/rsms/inter/releases/latest \
+        | python3 -c "import sys,json; \
+          [print(a['browser_download_url']) for a in json.load(sys.stdin)['assets'] \
+          if a['name'].endswith('.zip') and 'Inter-' in a['name']]" | head -1) \
+    && curl -sL "$INTER_URL" -o /tmp/inter.zip \
+    && unzip -q /tmp/inter.zip -d /tmp/inter \
+    && find /tmp/inter -name "Inter-*.otf" ! -name "*Italic*" \
+       -exec cp {} /usr/share/fonts/inter/ \; \
+    && rm -rf /tmp/inter /tmp/inter.zip \
+    && fc-cache -f /usr/share/fonts/inter
+
+# JetBrains Mono
+RUN JBMONO_URL=$(curl -s https://api.github.com/repos/JetBrains/JetBrainsMono/releases/latest \
+        | python3 -c "import sys,json; \
+          [print(a['browser_download_url']) for a in json.load(sys.stdin)['assets'] \
+          if a['name'] == 'JetBrainsMono.zip']" | head -1) \
+    && curl -sL "$JBMONO_URL" -o /tmp/jbmono.zip \
+    && unzip -q /tmp/jbmono.zip -d /tmp/jbmono \
+    && find /tmp/jbmono/fonts/ttf -name "*.ttf" \
+       -exec cp {} /usr/share/fonts/jetbrains-mono/ \; \
+    && rm -rf /tmp/jbmono /tmp/jbmono.zip \
+    && fc-cache -f /usr/share/fonts/jetbrains-mono
+
+RUN ostree container commit
+
+# ── Tapeta ───────────────────────────────────────────────────
+# Uncomment po dodaniu pliku wallpapers/wallpaper.jpg do repo
+# COPY wallpapers/ /usr/share/backgrounds/mba-a1466/
+# RUN chmod 644 /usr/share/backgrounds/mba-a1466/*
+
+# ── GNOME dconf defaults ──────────────────────────────────────
+# dconf profile — system-wide defaults (nie nadpisują ustawień usera)
+COPY config/gnome/dconf-mba-a1466 /etc/dconf/db/local.d/01-mba-a1466
+COPY config/gnome/dconf-profile    /etc/dconf/profile/user
+RUN dconf update \
+    && ostree container commit
+
+# ── adw-gtk3 theme (Flatpak) ─────────────────────────────────
+# Flatpak systemowy — dostępny dla wszystkich użytkowników
+RUN flatpak remote-add --system --if-not-exists flathub \
+        https://dl.flathub.org/repo/flathub.flatpakrepo \
+    && flatpak install --system -y flathub \
+        org.gtk.Gtk3theme.adw-gtk3 \
+        org.gtk.Gtk3theme.adw-gtk3-dark \
+    && flatpak override --system --gtk-theme=adw-gtk3-dark \
+    && flatpak override --system --icon-theme=Papirus-Dark \
+    && ostree container commit
+
+# ── Flatpak apps (systemowe) ─────────────────────────────────
+# Instalacja systemowa — dostępne od razu po pierwszym logowaniu
+RUN flatpak install --system -y flathub \
+    org.mozilla.firefox \
+    com.raggesilver.BlackBox \
+    org.gnome.TextEditor \
+    com.visualstudio.code \
+    org.signal.Signal \
+    com.discordapp.Discord \
+    org.videolan.VLC \
+    com.mattjakeman.ExtensionManager \
+    io.github.flattool.Warehouse \
+    org.gnome.baobab \
+    md.obsidian.Obsidian \
+    com.spotify.Client \
+    && ostree container commit
+
+# ── Finalne uprawnienia ───────────────────────────────────────
+RUN chmod 644 /etc/modprobe.d/blacklist-broadcom.conf \
+    && chmod 644 /etc/modules-load.d/broadcom-wl.conf \
+    && chmod 644 /etc/tlp.conf \
+    && chmod 644 /etc/kernel/cmdline

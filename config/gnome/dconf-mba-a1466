@@ -1,0 +1,60 @@
+# /etc/dconf/db/local.d/01-mba-a1466
+# System-wide GNOME defaults dla MacBook Air A1466
+# Użytkownik może nadpisać te ustawienia — to są tylko defaults
+
+[org/gnome/desktop/interface]
+color-scheme='prefer-dark'
+gtk-theme='adw-gtk3-dark'
+icon-theme='Papirus-Dark'
+cursor-theme='Adwaita'
+font-name='Inter 11'
+document-font-name='Inter 11'
+monospace-font-name='JetBrains Mono 11'
+font-antialiasing='rgba'
+font-hinting='slight'
+clock-show-weekday=true
+clock-show-seconds=false
+show-battery-percentage=true
+
+[org/gnome/desktop/peripherals/touchpad]
+natural-scroll=true
+tap-to-click=true
+two-finger-scrolling-enabled=true
+disable-while-typing=true
+speed=0.20000000000000001
+
+[org/gnome/desktop/peripherals/keyboard]
+numlock-state=false
+
+[org/gnome/desktop/input-sources]
+sources=[('xkb', 'pl')]
+xkb-options=['caps:escape']
+
+[org/gnome/desktop/session]
+idle-delay=uint32 300
+
+[org/gnome/desktop/wm/preferences]
+button-layout='appmenu:minimize,maximize,close'
+num-workspaces=4
+
+[org/gnome/mutter]
+dynamic-workspaces=true
+center-new-windows=true
+workspaces-only-on-primary=false
+
+[org/gnome/shell]
+favorite-apps=['org.mozilla.firefox.desktop', 'com.raggesilver.BlackBox.desktop', 'com.visualstudio.code.desktop', 'md.obsidian.Obsidian.desktop', 'org.gnome.Nautilus.desktop']
+
+[org/gnome/shell/overrides]
+workspaces-only-on-primary=false
+
+[org/gnome/settings-daemon/plugins/power]
+sleep-inactive-ac-timeout=1800
+sleep-inactive-battery-timeout=600
+power-button-action='suspend'
+ambient-enabled=true
+
+[org/gnome/settings-daemon/plugins/color]
+night-light-enabled=true
+night-light-temperature=uint32 3700
+night-light-schedule-automatic=true
