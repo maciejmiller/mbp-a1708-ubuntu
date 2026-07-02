@@ -1,7 +1,7 @@
 #!/bin/bash
 # MacBook Pro A1708 (MacBookPro14,1) Ubuntu Setup Installer
 # Tested on Ubuntu 26.04 / kernel 7.0
-# https://github.com/your-username/mbp-a1708-ubuntu
+# https://github.com/maciejmiller/mbp-a1708-ubuntu
 
 set -euo pipefail
 

@@ -22,7 +22,7 @@ Tested on **Ubuntu 26.04 / kernel 7.0**.
 
 ## Quick Start
 
-    git clone https://github.com/a1708ubuntu/mbp-a1708-ubuntu
+    git clone https://github.com/maciejmiller/mbp-a1708-ubuntu
     cd mbp-a1708-ubuntu
     sudo bash install-mbp-a1708.sh
 
