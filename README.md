@@ -67,7 +67,7 @@ broadcom-sta (bcmwl) if present, as it conflicts with brcmfmac.
 ### Audio
 
 Cirrus CS8409 driver installed via DKMS from davidjo/snd_hda_macbookpro.
-Patches for kernel 6.17+ are applied automatically.
+Requires linux-source package — installed automatically by the script.
 
 ### Camera
 
@@ -84,6 +84,19 @@ Forces applespi, intel_lpss_pci, and spi_pxa2xx_platform into the initramfs
 via /etc/dracut.conf.d/macbook.conf. Prevents unbootable system after kernel
 updates on Ubuntu 26.04 (dracut-based).
 
+### GNOME
+
+Applies a clean macOS-inspired GNOME setup:
+
+- Theme: Yaru-sage (GTK + icons)
+- Font: Inter 10 (UI), Ubuntu Mono 10 (terminal)
+- Window buttons: left-side layout (minimize, maximize, close)
+- Extensions: dash-to-dock, just-perfection, transparent-top-bar, tiling-assistant, ding
+- Dash-to-dock: bottom position, 48px icons, dots indicator
+
+Extensions are installed via GNOME Shell Extensions API. If auto-install fails,
+install manually via Extension Manager.
+
 ---
 
 ## Known Limitations
@@ -92,7 +105,10 @@ updates on Ubuntu 26.04 (dracut-based).
   button or touchpad (hardware limitation on A1708 under Linux).
 - acpi_osi=Darwin: do not use — causes keyboard and touchpad loss at boot.
 - thunderbolt.security=none disables Thunderbolt device authorization entirely.
-  This is acceptable for a personal machine but be aware of the security implications.
+  Acceptable for personal use but be aware of the security implications.
+- Touchpad cursor jumps: applespi kernel driver occasionally reports invalid
+  coordinates ("Touch jump detected"). Mitigated by libinput quirk in
+  /etc/libinput/local-overrides.quirks — may still occur rarely.
 
 ---
 

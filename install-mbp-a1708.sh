@@ -322,7 +322,7 @@ module_audio() {
     fi
 
     info "Instalowanie zależności..."
-    apt-get install -y dkms git linux-headers-"$(uname -r)" >> "$LOGFILE" 2>&1
+    apt-get install -y dkms git linux-headers-"$(uname -r)" linux-source-"$(uname -r | cut -d- -f1)" >> "$LOGFILE" 2>&1
 
     info "Klonowanie snd_hda_macbookpro..."
     local tmpdir
@@ -388,7 +388,11 @@ module_camera() {
 
     # DKMS
     pushd "$tmpdir/facetimehd" > /dev/null
-    if make dkms >> "$LOGFILE" 2>&1; then
+    local ft_ver
+    ft_ver=$(grep '^PACKAGE_VERSION' dkms.conf | cut -d= -f2 | tr -d '"')
+    if dkms add . >> "$LOGFILE" 2>&1 && \
+       dkms build facetimehd/"$ft_ver" >> "$LOGFILE" 2>&1 && \
+       dkms install facetimehd/"$ft_ver" >> "$LOGFILE" 2>&1; then
         modprobe facetimehd 2>/dev/null || true
         ok "facetimehd DKMS zainstalowany"
         result_ok "Kamera"
@@ -448,6 +452,77 @@ module_dracut() {
     fi
 }
 
+module_gnome() {
+    header "GNOME — extensions, fonts, theme"
+
+    local REAL_USER="${SUDO_USER:-$USER}"
+    local REAL_HOME
+    REAL_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)
+
+    # Install Inter font
+    info "Installing Inter font..."
+    apt-get install -y fonts-inter 2>/dev/null >> "$LOGFILE" 2>&1 || \
+    apt-get install -y fonts-inter-variable 2>/dev/null >> "$LOGFILE" 2>&1 || \
+    pip3 install --break-system-packages inter-font 2>/dev/null >> "$LOGFILE" 2>&1 || true
+
+    # Install extension manager
+    info "Installing GNOME Extension Manager..."
+    apt-get install -y gnome-shell-extension-manager 2>/dev/null >> "$LOGFILE" 2>&1 || true
+
+    # Apply dconf settings as real user
+    info "Applying GNOME settings..."
+    sudo -u "$REAL_USER" dconf write /org/gnome/desktop/interface/gtk-theme "'Yaru-sage'" 2>/dev/null || true
+    sudo -u "$REAL_USER" dconf write /org/gnome/desktop/interface/icon-theme "'Yaru-sage'" 2>/dev/null || true
+    sudo -u "$REAL_USER" dconf write /org/gnome/desktop/interface/font-name "'Inter 10'" 2>/dev/null || true
+    sudo -u "$REAL_USER" dconf write /org/gnome/desktop/interface/document-font-name "'Inter 10'" 2>/dev/null || true
+    sudo -u "$REAL_USER" dconf write /org/gnome/desktop/interface/monospace-font-name "'Ubuntu Mono 10'" 2>/dev/null || true
+    sudo -u "$REAL_USER" dconf write /org/gnome/desktop/interface/color-scheme "'default'" 2>/dev/null || true
+    sudo -u "$REAL_USER" dconf write /org/gnome/desktop/interface/accent-color "'slate'" 2>/dev/null || true
+    sudo -u "$REAL_USER" dconf write /org/gnome/desktop/wm/preferences/button-layout "'icon,menu:minimize,maximize,close'" 2>/dev/null || true
+    sudo -u "$REAL_USER" dconf write /org/gnome/desktop/wm/keybindings/close "['<Super>q']" 2>/dev/null || true
+
+    # Dash-to-dock settings
+    sudo -u "$REAL_USER" dconf write /org/gnome/shell/extensions/dash-to-dock/dock-position "'BOTTOM'" 2>/dev/null || true
+    sudo -u "$REAL_USER" dconf write /org/gnome/shell/extensions/dash-to-dock/dash-max-icon-size 48 2>/dev/null || true
+    sudo -u "$REAL_USER" dconf write /org/gnome/shell/extensions/dash-to-dock/custom-theme-shrink true 2>/dev/null || true
+    sudo -u "$REAL_USER" dconf write /org/gnome/shell/extensions/dash-to-dock/running-indicator-style "'DOTS'" 2>/dev/null || true
+    sudo -u "$REAL_USER" dconf write /org/gnome/shell/extensions/dash-to-dock/transparency-mode "'FIXED'" 2>/dev/null || true
+    sudo -u "$REAL_USER" dconf write /org/gnome/shell/extensions/dash-to-dock/background-opacity 0.3 2>/dev/null || true
+
+    # Just Perfection
+    sudo -u "$REAL_USER" dconf write /org/gnome/shell/extensions/just-perfection/clock-menu-position 1 2>/dev/null || true
+    sudo -u "$REAL_USER" dconf write /org/gnome/shell/extensions/just-perfection/clock-menu-position-offset 8 2>/dev/null || true
+
+    # Tiling assistant
+    sudo -u "$REAL_USER" dconf write /org/gnome/shell/extensions/tiling-assistant/focus-hint-color "'rgb(101,123,105)'" 2>/dev/null || true
+
+    ok "GNOME settings applied"
+
+    # Extensions to install via gdbus
+    local extensions=(
+        "dash-to-dock@micxgx.gmail.com"
+        "just-perfection-desktop@just-perfection"
+        "transparent-top-bar@ftpix.com"
+        "tiling-assistant@ubuntu.com"
+        "ding@rastersoft.com"
+    )
+
+    info "Installing GNOME extensions..."
+    for ext in "${extensions[@]}"; do
+        if [[ -d "$REAL_HOME/.local/share/gnome-shell/extensions/$ext" ]]; then
+            ok "Extension already installed: $ext"
+        else
+            sudo -u "$REAL_USER" gdbus call --session \
+                --dest org.gnome.Shell.Extensions \
+                --object-path /org/gnome/Shell/Extensions \
+                --method org.gnome.Shell.Extensions.InstallRemoteExtension \
+                "$ext" >> "$LOGFILE" 2>&1 || warn "Could not auto-install $ext — install manually via Extension Manager"
+        fi
+    done
+
+    result_ok "GNOME — reboot required to activate extensions"
+}
+
 # ─── Summary ──────────────────────────────────────────────────────────────────
 print_summary() {
     header "Podsumowanie"
@@ -495,6 +570,7 @@ main() {
     ask "Camera — facetimehd DKMS?" && module_camera   || result_skip "Camera"
     ask "Keyboard — apple model?" && module_keyboard || result_skip "Keyboard"
     ask "Dracut — force essential modules into initramfs?" && module_dracut   || result_skip "Dracut"
+    ask "GNOME — theme, fonts, extensions, dock settings?"  && module_gnome    || result_skip "GNOME"
 
     print_summary
     log "=== Instalacja zakończona ==="
